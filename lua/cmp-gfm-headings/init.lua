@@ -1,3 +1,5 @@
+local cmp = require("cmp")
+
 local M = {}
 
 -- Default configuration
@@ -15,7 +17,11 @@ local function get_headings()
 		local level, heading = line:match("^(#+)%s+(.+)$")
 		if level and heading then
 			-- Convert to GFM format: lowercase and replace spaces with dashes
-			local gfm_heading = heading:lower():gsub("%s+", "-")
+			local gfm_heading = vim
+				.fn
+				.tolower(heading)
+				:gsub("[%.:%-]", "") -- Remove dots, colons, and hyphens
+				:gsub("%s+", "-") -- Replace multiple spaces with a single dash
 			-- Get the next few lines for documentation (up to `preview_lines` lines, excluding other headings)
 			local documentation = {}
 			for j = i + 1, i + M.config.preview_lines do
@@ -40,6 +46,7 @@ local function get_headings()
 	return headings
 end
 
+-- Custom source for nvim-cmp
 local source = {}
 
 source.new = function()
@@ -72,12 +79,12 @@ source.complete = function(self, request, callback)
 
 	for _, h in ipairs(headings) do
 		table.insert(items, {
-			label = h.level .. " " .. h.heading,
-			insertText = h.gfm_heading,
+			label = h.level .. " " .. h.heading, -- Display heading level and text
+			insertText = h.gfm_heading .. ")", -- Insert the GFM-formatted heading
 			documentation = {
-				kind = "markdown",
-				value = "**" .. h.gfm_heading .. "**\n\n" .. h.documentation,
-			}, -- Show heading and content below
+				kind = cmp.lsp.MarkupKind.Markdown,
+				value = "**" .. h.heading .. "**\n\n" .. h.documentation,
+			},
 		})
 	end
 
@@ -89,7 +96,7 @@ M.setup = function(opts)
 	-- Merge user options with defaults
 	M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 
-	require("cmp").register_source("gfm_headings", source.new())
+	cmp.register_source("gfm_headings", source.new())
 end
 
 return M
